@@ -8,20 +8,25 @@
 
 import UIKit
 
-class AllGroupsTVCell: UITableViewCell {
+class AllGroupsTVCell2: UITableViewCell {
     
-    @IBOutlet private weak var avatarGroup: UIImageView!
-    @IBOutlet private weak var nameGroup: UILabel!
-    @IBOutlet private weak var noteGroup: UILabel!
+    let api = ApiService()
+    
+    @IBOutlet weak var avatarGroup: UIImageView!
+    @IBOutlet weak var nameGroup: UILabel!
+    @IBOutlet weak var noteGroup: UILabel!
+    @IBOutlet weak var activityGroup: UILabel!
     
     var allGroup: Group? {
         didSet {
             nameGroup.text = allGroup?.name
-            noteGroup.text = allGroup?.screenName
+            noteGroup.text = "\(allGroup?.membersCount ?? 0) подписчика(-ов)"
+            activityGroup.text = allGroup?.activity
+            
             guard let url = allGroup?.photo100 else { return }
             DispatchQueue.main.async { [weak self] in
                 guard let s = self else { return }
-                ApiWrapper.loadPhoto(imgURL: url, imgView: s.avatarGroup)
+                self?.api.loadPhoto(imgURL: url, imgView: s.avatarGroup)
             }
         }
     }

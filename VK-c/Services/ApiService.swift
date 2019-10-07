@@ -10,14 +10,18 @@ import Foundation
 import Alamofire
 import SwiftyJSON
 
-struct ApiWrapper {
+struct ApiService {
     
-    static var baseURL = "https://api.vk.com/method"
-    static var versionApi = "5.80"
+    let baseURL: StUserDataService
+    let versionApi: String
+    let userData = UserData()
     
-    private init() {}
+    init() {
+        versionApi = "5.101"
+        baseURL = "https://api.vk.com/method"
+    }
     
-    static var loginURL: URLRequest {
+    var loginURL: URLRequest {
         var components = URLComponents()
         components.scheme = "https"
         components.host = "oauth.vk.com"
@@ -26,7 +30,7 @@ struct ApiWrapper {
             URLQueryItem(name: "client_id", value: "6308669"),
             URLQueryItem(name: "display", value: "mobile"),
             URLQueryItem(name: "redirect_url", value: "https//oauth.vk.com/blank.html"),
-            URLQueryItem(name: "scope", value: "275526"),
+            URLQueryItem(name: "scope", value: "405510"),
             URLQueryItem(name: "response_type", value: "token"),
             URLQueryItem(name: "v", value: versionApi)
         ]
@@ -34,8 +38,8 @@ struct ApiWrapper {
         return URLRequest(url: components.url!)
     }
     
-    static func getNewsFeed(startFrom: String, resultCount: Int, completion: @escaping ([NewsModelForCell], String) -> Void){
-        guard let accessToken = UserData.getToken() else {
+    func getNewsFeed(startFrom: String, resultCount: Int, completion: @escaping ([NewsModelForCell], String) -> Void){
+        guard let accessToken = userData.getToken() else {
             return
         }
         let methodName = "/newsfeed.get"
@@ -48,7 +52,7 @@ struct ApiWrapper {
         ]
         
         DispatchQueue.global().async {
-            Alamofire.request(baseURL+methodName, parameters: params)
+            Alamofire.request(self.baseURL+methodName, parameters: params)
                 .responseData(queue: DispatchQueue.global()) { response in
                     if let result = response.result.value {
                         let myResponse = try! JSONDecoder().decode(ResponseNewsFeedRoot.self, from: result)
@@ -67,20 +71,20 @@ struct ApiWrapper {
     }
     // MARK: - Группа
     // получение списка групп пользователя
-    static func getGroups(completion: @escaping ([Group]) -> Void) {
-        guard let accessToken = UserData.getToken() else {
+    func getGroups(completion: @escaping ([Group]) -> Void) {
+        guard let accessToken = userData.getToken() else {
             return
         }
         let methodName = "/groups.get"
         let params: Parameters = [
             "access_token" : accessToken,
-            //"user_id" : UserData.getCurrentUserId(),
             "extended" : "1",
+            "fields": "description,activity,members_count",
             "count" : "50",
             "v" : versionApi,
             ]
         DispatchQueue.global().async {
-            Alamofire.request(baseURL+methodName, parameters: params).responseData(completionHandler: {response in
+            Alamofire.request(self.baseURL+methodName, parameters: params).responseData(completionHandler: {response in
                 if let result = response.result.value {
                     let myResponse = try! JSONDecoder().decode(ResponseGroupsRoot.self, from: result)
                     completion(myResponse.responseGroupsRoot.groups)
@@ -94,13 +98,13 @@ struct ApiWrapper {
     }
     //MARK: - получение информации о группе по Id
     // todo доделать
-    static func getGroupById(for id: String, completion: @escaping ([Group]) -> Void){
+    func getGroupById(for id: String, completion: @escaping ([Group]) -> Void){
         let methodName = "/groups.getById"
         let params: Parameters = [
             //"access_token" : UserData.getToken(),
             "group_id": id,
             "type": "group",
-            "fields": "description",
+            "fields": "description,activity,members_count",
             "sort": "0",
             "count": "50",
             "v": versionApi
@@ -114,22 +118,21 @@ struct ApiWrapper {
     }
     
     // получение списка друзей
-    static func getFriends(completion: @escaping ([User]) -> Void) {
-        guard let accessToken = UserData.getToken() else {
+    func getFriends(completion: @escaping ([User]) -> Void) {
+        guard let accessToken = userData.getToken() else {
             return
         }
         
         let methodName = "/friends.get"
         let params: Parameters = [
             "access_token" : accessToken,
-            //"user_id" : userId,
             "order" : "name",
             "count" : "5000",
             "fields": "id, first_name, last_name, photo_50, photo_100, photo_200, photo_400_orig",
             "v" : versionApi
         ]
         DispatchQueue.global().async {
-            Alamofire.request(baseURL+methodName, parameters: params).responseData(completionHandler: { response in
+            Alamofire.request(self.baseURL+methodName, parameters: params).responseData(completionHandler: { response in
                 if let result = response.result.value {
                     let myResponse = try! JSONDecoder().decode(ResponseFriendsRoot.self, from: result)
                     completion(myResponse.responseFriendsRoot.friends)
@@ -138,28 +141,29 @@ struct ApiWrapper {
         }
     }
     
-    static func getMembersGroup(groupId: Int, label: UILabel) {
+    func getMembersGroup(groupId: Int, label: UILabel) {
+        guard let accessToken = userData.getToken() else {
+            return
+        }
         let methodName = "/groups.getMembers"
         let params: Parameters = [
-            //"access_token" : .getToken(),
+            "access_token" : accessToken,
             "group_id" : groupId,
-            "sort" : "id_asc",
             "count" : "1",
-            "fields": "id, first_name, last_name, photo_50, photo_100, online",
             "v" : versionApi
         ]
         DispatchQueue.global().sync {
             Alamofire.request(baseURL+methodName, parameters: params).responseData(completionHandler: {response in
                 if let result = response.result.value {
-                    let myResponse = try! JSONDecoder().decode(ResponseFriendsRoot.self, from: result)
-                    label.text = String(myResponse.responseFriendsRoot.count)+" подписчиков"
+                    let myResponse = try! JSONDecoder().decode(ResponseGroupMembersRoot.self, from: result)
+                    label.text = String(myResponse.responseGroupMembersRoot.count)+" подписчиков"
                 }
             })
         }
     }
     
-    static func searchGroups(for query: String, completion: @escaping ([Group]) -> Void) {
-        guard let accessToken = UserData.getToken() else {
+    func searchGroups(for query: String, completion: @escaping ([Group]) -> Void) {
+        guard let accessToken = userData.getToken() else {
             return
         }
         let methodName = "/groups.search"
@@ -169,6 +173,7 @@ struct ApiWrapper {
             "q": query,
             "type": "group",
             "offset": "0",
+            "fields": "description,activity",
             "sort": "0",
             "count": "50",
             "v": versionApi
@@ -183,7 +188,7 @@ struct ApiWrapper {
         }
     }
     
-    static func loadPhoto(imgURL: String, imgView: UIImageView) {
+    func loadPhoto(imgURL: String, imgView: UIImageView) {
         DispatchQueue.main.async {
             Alamofire.request(imgURL).responseData {
                 response in
